@@ -4,28 +4,28 @@ import { findByProps } from "@webpack";
 class FakeDeafen {
     private original_voice_state_update: any;
     private ui_mutation_observer: MutationObserver | null = null;
-    private is_fake_deafen_enabled = false;
+    private is_fd_enabled = false;
 
     public start() {
-        const GatewayConnection = findByProps("voiceStateUpdate", "voiceServerPing");
+        const GatewayConnection = findByProps("voiceStateUpdate");
         if (!GatewayConnection) return;
         this.original_voice_state_update = GatewayConnection.voiceStateUpdate;
         const self = this;
         GatewayConnection.voiceStateUpdate = function (args: any) {
-            if (self.is_fake_deafen_enabled && args) {
+            if (self.is_fd_enabled && args) {
                 args.selfMute = true;
                 args.selfDeaf = true;
             }
             return self.original_voice_state_update.apply(this, arguments);
         };
 
-        this.ui_mutation_observer = new MutationObserver(() => this.mount_fake_deafen_button());
+        this.ui_mutation_observer = new MutationObserver(() => this.mount_fd_button());
         this.ui_mutation_observer.observe(document.body, { childList: true, subtree: true });
-        this.mount_fake_deafen_button();
+        this.mount_fd_button();
     }
 
     public stop() {
-        const GatewayConnection = findByProps("voiceStateUpdate", "voiceServerPing");
+        const GatewayConnection = findByProps("voiceStateUpdate");
         if (GatewayConnection && this.original_voice_state_update) {
             GatewayConnection.voiceStateUpdate = this.original_voice_state_update;
         }
@@ -37,7 +37,7 @@ class FakeDeafen {
     private refresh_voice_state() {
         const ChannelStore = findByProps("getChannel", "getDMFromUserId");
         const SelectedChannelStore = findByProps("getVoiceChannelId");
-        const GatewayConnection = findByProps("voiceStateUpdate", "voiceServerPing"); // voiceServerPing really usefull ?
+        const GatewayConnection = findByProps("voiceStateUpdate");
         const MediaEngineStore = findByProps("isDeaf", "isMute");
         if (!GatewayConnection || !SelectedChannelStore) return;
 
@@ -48,8 +48,8 @@ class FakeDeafen {
 			GatewayConnection.voiceStateUpdate({
 				channelId: channel.id,
 				guildId: channel.guild_id,
-				selfMute: this.is_fake_deafen_enabled || (MediaEngineStore?.isMute() ?? false),
-				selfDeaf: this.is_fake_deafen_enabled || (MediaEngineStore?.isDeaf() ?? false)
+				selfMute: this.is_fd_enabled || (MediaEngineStore?.isMute() ?? false),
+				selfDeaf: this.is_fd_enabled || (MediaEngineStore?.isDeaf() ?? false)
             });
         }
     }
@@ -83,35 +83,35 @@ class FakeDeafen {
         return buttons.length > 0 ? buttons[0] : null;
     }
 
-    private mount_fake_deafen_button() {
-        // stop if already present
+    private mount_fd_button() {
+        // stop if button already there
         if (document.getElementById("fd-btn")) return;
         
         const mute_btn = this.find_discord_mute_button();
         if (!mute_btn) return;
 
         // base button creation
-        const fake_btn = document.createElement("button");
-        fake_btn.id = "fd-btn";
-        fake_btn.className = mute_btn.className;
-        fake_btn.setAttribute("aria-label", "Fake Deafen");
+        const fd_btn = document.createElement("button");
+        fd_btn.id = "fd-btn";
+        fd_btn.className = mute_btn.className;
+        fd_btn.setAttribute("aria-label", "Fake Deafen");
 
-        // render function to avoid repetition
+        // render function
         const update_view = () => {
             const inner_class = mute_btn.querySelector('div')?.className || '';
-            fake_btn.innerHTML = `<div class="${inner_class}">${this.get_icon_svg(this.is_fake_deafen_enabled)}</div>`;
+            fd_btn.innerHTML = `<div class="${inner_class}">${this.get_icon_svg(this.is_fd_enabled)}</div>`;
         };
 
         // click handling
-        fake_btn.onclick = () => {
-            this.is_fake_deafen_enabled = !this.is_fake_deafen_enabled;
+        fd_btn.onclick = () => {
+            this.is_fd_enabled = !this.is_fd_enabled;
             update_view();
             this.refresh_voice_state();
         };
 
         // init and insertion
         update_view();
-        mute_btn.parentElement?.insertBefore(fake_btn, mute_btn);
+        mute_btn.parentElement?.insertBefore(fd_btn, mute_btn);
     }
 }
 
