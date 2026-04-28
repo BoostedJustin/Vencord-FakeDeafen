@@ -4,28 +4,39 @@ import { findByProps, findComponentByCodeLazy } from "@webpack";
 
 const Button = findComponentByCodeLazy(".GREEN,positionKeyStemOverride:");
 let enabled = false;
+let originalSend: any;
 
 function refresh_voice_state(enabled: boolean) {
     const ChannelStore = findByProps("getChannel", "getDMFromUserId");
     const SelectedChannelStore = findByProps("getVoiceChannelId");
-    const GatewayConnection = findByProps("voiceStateUpdate");
+    const wsModule = findByProps("getSocket");
     const MediaEngineStore = findByProps("isDeaf", "isMute");
-    
-    if (!GatewayConnection || !SelectedChannelStore) {
-        console.log("[FakeDeafen] GatewayConnection or SelectedChannelStore not found");
-        return;
-    }
+    let caca = 0;
 
+    if (!wsModule) {
+        console.log("[FakeDeafen] WebSocket Gateway not found");
+        caca += 1;
+    }
+    if (!SelectedChannelStore) {
+        console.log("[FakeDeafen] SelectedChannelStore not found");
+        caca += 1;
+    }
+    if (caca > 0) return;
+    
+    const socket = wsModule.getSocket();
     const channelId = SelectedChannelStore.getVoiceChannelId();
     const channel = channelId ? ChannelStore?.getChannel(channelId) : null;
     
-    if (channel) {
+    if (socket && channelId) {
         try {
-            GatewayConnection.voiceStateUpdate({
-                channelId: channel.id,
-                guildId: channel.guild_id,
-                selfMute: enabled || (MediaEngineStore?.isMute() ?? false),
-                selfDeaf: enabled || (MediaEngineStore?.isDeaf() ?? false)
+            // op code 4 = voiceStateUpdate
+            socket.send(4, {
+                guild_id: channel?.guild_id ?? null,
+                channel_id: channelId,
+                self_mute: enabled || (MediaEngineStore?.isMute() ?? false),
+                self_deaf: enabled || (MediaEngineStore?.isDeaf() ?? false),
+                self_video: false,
+                flags: 0
             });
         } catch (error) {
             console.error("[FakeDeafen] failed to update voice state:", error);
@@ -76,31 +87,38 @@ function fd_button(props: { nameplate?: any; }) {
     );
 }
 
-let originalVoiceStateUpdate: any;
-
 export default definePlugin({
     name: "FakeDeafen",
     description: "Fake deafen yourself",
     authors: [{ name: "hyyven", id: 449282863582412850n }],
 
     start() {
-        const GatewayConnection = findByProps("voiceStateUpdate");
-        if (!GatewayConnection) return;
+        const wsModule = findByProps("getSocket");
+        if (!wsModule) return;
+        const socket = wsModule.getSocket();
+        if (!socket) return;
         
-        originalVoiceStateUpdate = GatewayConnection.voiceStateUpdate;
-        GatewayConnection.voiceStateUpdate = function (args: any) {
-            if (enabled && args) {
-                args.selfMute = true;
-                args.selfDeaf = true;
+        // default send function
+        originalSend = socket.send;
+        
+        // modify send function 
+        socket.send = function (op: number, data: any, ...args: any[]) {
+            // op code 4 = voiceStateUpdate don't ask me why
+            if (op === 4 && enabled && data) {
+                data.self_mute = true;
+                data.self_deaf = true;
             }
-            return originalVoiceStateUpdate.apply(this, arguments);
+            return originalSend.apply(this, [op, data, ...args]);
         };
     },
 
     stop() {
-        const GatewayConnection = findByProps("voiceStateUpdate");
-        if (GatewayConnection && originalVoiceStateUpdate) {
-            GatewayConnection.voiceStateUpdate = originalVoiceStateUpdate;
+        const wsModule = findByProps("getSocket");
+        if (wsModule) {
+            const socket = wsModule.getSocket();
+            if (socket && originalSend) {
+                socket.send = originalSend;
+            }
         }
     },
 
