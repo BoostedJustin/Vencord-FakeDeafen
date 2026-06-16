@@ -1,6 +1,7 @@
 import ErrorBoundary from "@components/ErrorBoundary";
 import definePlugin from "@utils/types";
 import { findByProps, findComponentByCodeLazy } from "@webpack";
+import Settings from "./settings";
 
 const Button = findComponentByCodeLazy(".GREEN,positionKeyStemOverride:");
 let enabled = false;
@@ -33,8 +34,8 @@ function refresh_voice_state(enabled: boolean) {
             socket.send(4, {
                 guild_id: channel?.guild_id ?? null,
                 channel_id: channelId,
-                self_mute: enabled || (MediaEngineStore?.isMute() ?? false),
-                self_deaf: enabled || (MediaEngineStore?.isDeaf() ?? false),
+                self_mute: (enabled && Settings.store.fakeMute) || (MediaEngineStore?.isMute() ?? false),
+                self_deaf: (enabled && Settings.store.fakeDeafen) || (MediaEngineStore?.isDeaf() ?? false),
                 self_video: false,
                 flags: 0
             });
@@ -70,6 +71,18 @@ function fd_icon() {
     );
 }
 
+function toggleEnabled() {
+    enabled = !enabled;
+    refresh_voice_state(enabled);
+}
+
+function handleKeyDown(event: KeyboardEvent) {
+    if (event.ctrlKey && event.altKey && event.code === "KeyD") {
+        event.preventDefault();
+        toggleEnabled();
+    }
+}
+
 function fd_button(props: { nameplate?: any; }) {
     return (
         <Button
@@ -79,10 +92,7 @@ function fd_button(props: { nameplate?: any; }) {
             aria-checked={enabled}
             redGlow={enabled}
             plated={props?.nameplate != null}
-            onClick={() => {
-                enabled = !enabled;
-                refresh_voice_state(enabled);
-            }}
+            onClick={toggleEnabled}
         />
     );
 }
@@ -91,6 +101,7 @@ export default definePlugin({
     name: "FakeDeafen",
     description: "Fake deafen yourself",
     authors: [{ name: "hyyven", id: 449282863582412850n }],
+    settings: Settings,
 
     start() {
         const wsModule = findByProps("getSocket");
@@ -100,16 +111,16 @@ export default definePlugin({
         
         // default send function
         originalSend = socket.send;
-        
         // modify send function 
         socket.send = function (op: number, data: any, ...args: any[]) {
             // op code 4 = voiceStateUpdate don't ask me why
             if (op === 4 && enabled && data) {
-                data.self_mute = true;
-                data.self_deaf = true;
+                if (Settings.store.fakeMute) data.self_mute = true;
+                if (Settings.store.fakeDeafen) data.self_deaf = true;
             }
             return originalSend.apply(this, [op, data, ...args]);
         };
+        window.addEventListener("keydown", handleKeyDown);
     },
 
     stop() {
@@ -120,6 +131,7 @@ export default definePlugin({
                 socket.send = originalSend;
             }
         }
+        window.removeEventListener("keydown", handleKeyDown);
     },
 
     patches: [
