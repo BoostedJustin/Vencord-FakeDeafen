@@ -137,6 +137,7 @@ export default definePlugin({
     patches: [
         {
             find: ".DISPLAY_NAME_STYLES_COACHMARK)",
+            predicate: () => Settings.store.showButton,
             replacement: {
                 match: /children:\[(?=.{0,25}?accountContainerRef)/,
                 replace: "children:[$self.fd_button(arguments[0]),"
