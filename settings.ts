@@ -17,5 +17,10 @@ export default definePluginSettings({
         default: true,
         restartNeeded: true,
         description: "show the fake deafen button in the account area",
+    },
+    enableKeybind: {
+        type: OptionType.BOOLEAN,
+        default: true,
+        description: "enable the keybind (ctrl+shift+q) to toggle fake deafen",
     }
 });

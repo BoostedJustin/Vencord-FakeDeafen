@@ -77,7 +77,7 @@ function toggleEnabled() {
 }
 
 function handleKeyDown(event: KeyboardEvent) {
-    if (event.ctrlKey && event.altKey && event.code === "KeyD") {
+    if (Settings.store.enableKeybind && event.ctrlKey && event.shiftKey && event.code === "KeyQ") {
         event.preventDefault();
         toggleEnabled();
     }
