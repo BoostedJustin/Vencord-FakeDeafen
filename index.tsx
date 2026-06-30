@@ -6,6 +6,9 @@ import Settings from "./settings";
 const Button = findComponentByCodeLazy(".GREEN,positionKeyStemOverride:");
 let enabled = false;
 let originalSend: any;
+// merkt sich, ob das Mic schon VOR dem Aktivieren von Fake Deafen manuell gemutet war,
+// damit wir es beim Deaktivieren nicht ungewollt wieder freischalten
+let wasRealMuteBeforeFakeDeafen = false;
 
 function refresh_voice_state(enabled: boolean) {
     const ChannelStore = findByProps("getChannel", "getDMFromUserId");
@@ -74,6 +77,29 @@ function fd_icon() {
 function toggleEnabled() {
     enabled = !enabled;
     refresh_voice_state(enabled);
+
+    if (Settings.store.muteMicToo) {
+        const MediaEngineStore = findByProps("isDeaf", "isMute");
+        const MediaEngineActions = findByProps("toggleSelfMute");
+
+        if (!MediaEngineStore || !MediaEngineActions) {
+            console.log("[FakeDeafen] MediaEngine module(s) not found, skipping real mic mute");
+            return;
+        }
+
+        if (enabled) {
+            // Mic war schon manuell gemutet -> nichts tun, nur merken
+            wasRealMuteBeforeFakeDeafen = MediaEngineStore.isMute();
+            if (!wasRealMuteBeforeFakeDeafen) {
+                MediaEngineActions.toggleSelfMute();
+            }
+        } else {
+            // nur wieder unmuten, wenn WIR es gemutet haben
+            if (!wasRealMuteBeforeFakeDeafen && MediaEngineStore.isMute()) {
+                MediaEngineActions.toggleSelfMute();
+            }
+        }
+    }
 }
 
 function handleKeyDown(event: KeyboardEvent) {
