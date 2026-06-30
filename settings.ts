@@ -2,6 +2,11 @@ import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
 
 export default definePluginSettings({
+    muteMicToo: {
+        type: OptionType.BOOLEAN,
+        description: "Beim Aktivieren von Fake Deafen auch das echte Mikrofon stummschalten",
+        default: false
+    },
     fakeMute: {
         type: OptionType.BOOLEAN,
         default: true,
